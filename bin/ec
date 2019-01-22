@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Opens a file in existing Emacs or launches a new instance if Emacs is not running
+# Author: Damian Gaweda
+# URL: https://github.com/dgaw/ec
+
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+    echo "Open a file in existing Emacs or launch a new instance if Emacs is not running"
+    echo "Usage: ec [FILENAME]"
+    exit 0
+fi
+
+# Check if xdotool is available (used for focusing the Emacs window)
+command -v xdotool >/dev/null
+[ $? -eq 0 ] && USE_XDOTOOL=1 || USE_XDOTOOL=0
+
+# Include the bash profile so that custom PATH and LD_LIBRARY_PATH are set
+if [[ $PATH != *".local/bin:"* ]]; then
+    source ~/.profile 
+fi
+
+# No file name given - noop when Emacs starts
+if [ "$1" == "" ]; then
+    STARTEXPR="(identity nil)"
+# File name provided, open file when Emacs starts
+else
+    FILE=`realpath "$1"`
+    STARTEXPR="(progn (winum-select-window-1) (find-file \"$FILE\"))"
+fi
+
+# Emacs not running, start it
+if [ "`ps x|grep emacs|grep -vE '(grep|stack|gpg-agent)'`" == "" ]; then
+    if [ "$DISPLAY" == "" ]; then
+        emacs -nw --eval "$STARTEXPR"
+    else
+        emacs --eval "$STARTEXPR" &
+    fi
+
+# Emacs running, use emacsclient
+else
+    # Activate emacs window
+    if [ $USE_XDOTOOL -eq 1 ] && [ "$DISPLAY" != "" ]; then
+        xdotool search "emacs@" windowactivate --sync 2>/dev/null
+    fi
+    emacsclient -n --eval "$STARTEXPR"
+fi
